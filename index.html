@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>2027 국방예산 정부안 중점투자사업 분석 대시보드</title>
+  
+  <!-- Pretendard 웹폰트 -->
+  <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Font Awesome 6 CDN -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  
+  <!-- SheetJS (xlsx) CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+  <!-- 커스텀 CSS -->
+  <link rel="stylesheet" href="css/style.css">
+  
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            defense: {
+              50: '#f0f5ff',
+              100: '#e0ecff',
+              600: '#1d4ed8',
+              800: '#1e3a8a',
+              900: '#0f172a'
+            }
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="min-h-screen flex flex-col bg-slate-50 text-slate-800">
+
+  <!-- ==========================================
+       1. 최상단 네비게이션 헤더
+       ========================================== -->
+  <header class="bg-slate-900 text-white border-b border-slate-800 sticky top-0 z-40 shadow-md">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center shadow-lg shadow-blue-500/30">
+          <i class="fa-solid fa-chart-line text-white text-lg"></i>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="font-extrabold text-base sm:text-lg tracking-tight text-white">2027 국방예산 정부안 중점투자사업 분석 대시보드</h1>
+            <span class="hidden md:inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-blue-500/20 text-blue-300 border border-blue-400/30">
+              정부안 확정치
+            </span>
+          </div>
+          <p class="text-xs text-slate-400 hidden sm:block">분야별·신규사업별 예산 변동 추이 및 보도자료 핵심 근거 실시간 인터랙티브 분석</p>
+        </div>
+      </div>
+
+      <!-- 상단 우측 액션 버튼들 -->
+      <div class="flex items-center gap-2">
+        <button id="btnResetSample" title="초기 기본 2027 국방예산 데이터로 복원" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 rounded-lg border border-slate-700 transition flex items-center gap-1.5">
+          <i class="fa-solid fa-rotate-left"></i>
+          <span class="hidden sm:inline">샘플 복원</span>
+        </button>
+        <button id="btnDownloadTemplate" title="엑셀 서식 템플릿 다운로드" class="text-xs bg-slate-800 hover:bg-slate-700 text-emerald-300 px-3 py-2 rounded-lg border border-slate-700 transition flex items-center gap-1.5">
+          <i class="fa-solid fa-file-excel"></i>
+          <span class="hidden sm:inline">엑셀 양식</span>
+        </button>
+        <button onclick="window.print()" title="화면 인쇄 또는 PDF 저장" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-2 rounded-lg border border-slate-700 transition flex items-center gap-1.5">
+          <i class="fa-solid fa-print"></i>
+          <span class="hidden sm:inline">인쇄/PDF</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ==========================================
+       2. 파일 업로드 배너 (Drag & Drop Zone)
+       ========================================== -->
+  <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-5 w-full no-print">
+    <div id="uploadDropzone" class="upload-dropzone p-4 sm:p-5 flex flex-col sm:flex-row items-center justify-between gap-4 bg-white border border-dashed border-blue-200 shadow-sm">
+      <div class="flex items-center gap-4">
+        <div class="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 shrink-0">
+          <i class="fa-solid fa-cloud-arrow-up text-xl"></i>
+        </div>
+        <div>
+          <h2 class="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2">
+            사용자 엑셀(.xlsx, .xls) 또는 CSV 파일 업로드
+            <span class="text-xs font-normal text-slate-500 hidden md:inline">(이미지 서식 자동 인식)</span>
+          </h2>
+          <p class="text-xs text-slate-500 mt-0.5">
+            파일을 이곳에 끌어다 놓거나 클릭하여 선택하세요. <span class="text-blue-600 font-semibold">[연번, 분야, 세부사업, 단위, 2026년, 2027년, 증감, 증감율, 핵심내용]</span> 컬럼을 자동 분석합니다.
+          </p>
+        </div>
+      </div>
+      <div class="flex items-center gap-3 shrink-0">
+        <span id="loadedFileInfo" class="text-xs font-semibold px-3 py-1.5 rounded-full bg-blue-100 text-blue-800 border border-blue-200">
+          기본 데이터 로드됨
+        </span>
+        <button class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-4 py-2 rounded-lg shadow-sm transition flex items-center gap-1.5">
+          <i class="fa-solid fa-folder-open"></i> 파일 선택
+        </button>
+        <input type="file" id="fileInput" class="hidden" accept=".xlsx, .xls, .csv" />
+      </div>
+    </div>
+  </section>
+
+  <!-- ==========================================
+       3. 메인 핵심 KPI 통계 카드 그리드
+       ========================================== -->
+  <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-5 w-full">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      
+      <!-- 카드 1: 2026년 예산 총괄 -->
+      <div class="dashboard-card p-5 relative overflow-hidden">
+        <div class="flex items-center justify-between text-slate-500 mb-2">
+          <span class="text-xs font-bold uppercase tracking-wider">2026년 본예산 (A)</span>
+          <div class="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-600">
+            <i class="fa-solid fa-calendar-days text-sm"></i>
+          </div>
+        </div>
+        <div id="kpiTotal2026" class="text-2xl font-black text-slate-900 mb-1">-</div>
+        <div class="text-xs text-slate-400">전년도 확정 예산 총계</div>
+      </div>
+
+      <!-- 카드 2: 2027년 정부안 총괄 -->
+      <div class="dashboard-card p-5 relative overflow-hidden border-blue-200">
+        <div class="flex items-center justify-between text-blue-700 mb-2">
+          <span class="text-xs font-bold uppercase tracking-wider">2027년 정부안 (B)</span>
+          <div class="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600">
+            <i class="fa-solid fa-landmark text-sm"></i>
+          </div>
+        </div>
+        <div id="kpiTotal2027" class="text-2xl font-black text-blue-900 mb-1">-</div>
+        <div class="text-xs text-blue-600/80 font-medium">2027년도 중점투자 정부안</div>
+      </div>
+
+      <!-- 카드 3: 총 증감액 & 증가율 -->
+      <div class="dashboard-card p-5 relative overflow-hidden border-emerald-200">
+        <div class="flex items-center justify-between text-slate-500 mb-2">
+          <span class="text-xs font-bold uppercase tracking-wider">예산 증감 (B-A)</span>
+          <div class="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600">
+            <i class="fa-solid fa-arrow-trend-up text-sm"></i>
+          </div>
+        </div>
+        <div class="flex items-baseline gap-2 mb-1">
+          <div id="kpiTotalDiff" class="text-2xl font-black text-emerald-600">-</div>
+          <span id="kpiTotalRate" class="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">-</span>
+        </div>
+        <div class="text-xs text-slate-400">전년 대비 전체 증감 규모</div>
+      </div>
+
+      <!-- 카드 4: 신규 사업 집중 분석 -->
+      <div class="dashboard-card p-5 relative overflow-hidden border-purple-200 bg-gradient-to-br from-white to-purple-50/30">
+        <div class="flex items-center justify-between text-purple-700 mb-2">
+          <span class="text-xs font-bold uppercase tracking-wider flex items-center gap-1.5">
+            <i class="fa-solid fa-sparkles text-purple-500"></i> 신규/신설 사업 현황
+          </span>
+          <div class="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center text-purple-700">
+            <i class="fa-solid fa-bolt text-sm"></i>
+          </div>
+        </div>
+        <div id="kpiNewProjects" class="text-2xl font-black text-purple-900 mb-1">-</div>
+        <div class="text-xs text-purple-600/80 font-medium flex items-center justify-between">
+          <span>전체 <span id="kpiTotalProjects" class="font-bold">-</span> 중 신규</span>
+          <span class="underline cursor-pointer" onclick="switchTab('new-projects')">상세보기 &rarr;</span>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ==========================================
+       4. 탭 네비게이션
+       ========================================== -->
+  <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6 w-full no-print">
+    <div class="border-b border-slate-200 flex flex-wrap gap-2">
+      <button class="tab-btn active" data-tab="overview">
+        <i class="fa-solid fa-chart-pie"></i> 종합 대시보드
+      </button>
+      <button class="tab-btn" data-tab="domain">
+        <i class="fa-solid fa-layer-group"></i> 분야별 심층 분석
+      </button>
+      <button class="tab-btn" data-tab="new-projects">
+        <i class="fa-solid fa-wand-magic-sparkles text-purple-600"></i> 신규사업 집중 분석
+      </button>
+      <button class="tab-btn" data-tab="table">
+        <i class="fa-solid fa-table-list"></i> 데이터 탐색 및 검색
+      </button>
+    </div>
+  </section>
+
+  <!-- ==========================================
+       5. 탭별 컨텐츠 본문
+       ========================================== -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full flex-1">
+
+    <!-- ----------------------------------------
+         탭 1: 종합 대시보드 (Overview)
+         ---------------------------------------- -->
+    <div id="tab-overview" class="tab-content space-y-6">
+      
+      <!-- 상단 2분할 차트 섹션 -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        
+        <!-- 왼쪽: 분야별 2027 예산 비중 (도넛) -->
+        <div class="lg:col-span-5 dashboard-card p-5 flex flex-col">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h3 class="text-base font-bold text-slate-900">분야별(중점영역) 2027년 예산 비중</h3>
+              <p class="text-xs text-slate-400">정부안 기준 주요 투자 영역별 점유율</p>
+            </div>
+            <span class="text-xs font-semibold text-blue-600 bg-blue-50 px-2.5 py-1 rounded-md">단위: 억원</span>
+          </div>
+          <div class="chart-wrapper flex-1">
+            <canvas id="chartDomainShare"></canvas>
+          </div>
+        </div>
+
+        <!-- 오른쪽: 분야별 2026 vs 2027 예산 비교 막대 차트 -->
+        <div class="lg:col-span-7 dashboard-card p-5 flex flex-col">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h3 class="text-base font-bold text-slate-900">분야별 전년 대비 예산 증감 비교</h3>
+              <p class="text-xs text-slate-400">2026년 본예산 vs 2027년 정부안</p>
+            </div>
+            <span class="text-xs font-semibold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-md">전체 영역 비교</span>
+          </div>
+          <div class="chart-wrapper flex-1">
+            <canvas id="chartDomainCompare"></canvas>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- 중간 2분할: 증감액 TOP 5 & 최고 증감율 TOP 5 -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        
+        <!-- 증감액 TOP 5 -->
+        <div class="dashboard-card p-5">
+          <div class="flex items-center justify-between mb-3 pb-2 border-b border-slate-100">
+            <div class="flex items-center gap-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+              <h3 class="text-sm font-bold text-slate-900">예산 증감액(증액 규모) TOP 5</h3>
+            </div>
+            <span class="text-xs text-slate-400">클릭 시 원문 근거 확인</span>
+          </div>
+          <div id="topDiffList" class="space-y-2">
+            <!-- JS 동적 렌더링 -->
+          </div>
+        </div>
+
+        <!-- 최고 증감율 TOP 5 -->
+        <div class="dashboard-card p-5">
+          <div class="flex items-center justify-between mb-3 pb-2 border-b border-slate-100">
+            <div class="flex items-center gap-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-blue-500"></span>
+              <h3 class="text-sm font-bold text-slate-900">증가율(%) 최고 TOP 5</h3>
+            </div>
+            <span class="text-xs text-slate-400">기존 사업 대상</span>
+          </div>
+          <div id="topRateList" class="space-y-2">
+            <!-- JS 동적 렌더링 -->
+          </div>
+        </div>
+
+      </div>
+
+      <!-- 하단: 분야별 종합 요약 매트릭스 테이블 -->
+      <div class="dashboard-card overflow-hidden">
+        <div class="p-5 border-b border-slate-100 flex items-center justify-between">
+          <div>
+            <h3 class="text-base font-bold text-slate-900">분야별(중점영역) 예산 총계 현황표</h3>
+            <p class="text-xs text-slate-500">각 영역을 클릭하면 해당 분야 세부 사업 분석 화면으로 이동합니다.</p>
+          </div>
+          <button onclick="switchTab('table')" class="text-xs font-semibold text-blue-600 hover:text-blue-800 flex items-center gap-1">
+            원시 데이터 전체보기 &rarr;
+          </button>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-sm custom-table">
+            <thead>
+              <tr>
+                <th class="px-4 py-3">분야 (중점영역)</th>
+                <th class="px-4 py-3 text-center">사업 수</th>
+                <th class="px-4 py-3 text-right">2026년 본예산 (A)</th>
+                <th class="px-4 py-3 text-right">2027년 정부안 (B)</th>
+                <th class="px-4 py-3 text-right">증감액 (B-A)</th>
+                <th class="px-4 py-3 text-right">증감율 (%)</th>
+                <th class="px-4 py-3 text-right">전체 대비 비중</th>
+              </tr>
+            </thead>
+            <tbody id="domainSummaryTableBody">
+              <!-- JS 동적 렌더링 -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ----------------------------------------
+         탭 2: 분야별 심층 분석 (Domain)
+         ---------------------------------------- -->
+    <div id="tab-domain" class="tab-content hidden space-y-6">
+      
+      <!-- 분야 선택 컨트롤 바 -->
+      <div class="dashboard-card p-5 bg-gradient-to-r from-slate-900 via-blue-900 to-indigo-950 text-white">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <span class="text-xs font-semibold text-blue-300 uppercase tracking-wider block mb-1">분야별 심층 포커스</span>
+            <h2 id="domainViewTitle" class="text-xl sm:text-2xl font-black text-white">전체 분야 분석</h2>
+          </div>
+          <div class="flex items-center gap-2">
+            <label for="domainSelect" class="text-xs text-slate-300 whitespace-nowrap">분야 전환:</label>
+            <select id="domainSelect" class="bg-slate-800 text-white border border-slate-700 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-400 focus:outline-none">
+              <!-- JS 동적 생성 -->
+            </select>
+          </div>
+        </div>
+
+        <!-- 해당 분야 3대 요약 지표 -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-6 pt-5 border-t border-blue-800/60">
+          <div>
+            <span class="text-xs text-blue-300 block">해당 분야 사업 수</span>
+            <span id="domainStatProjects" class="text-xl font-bold text-white">-</span>
+          </div>
+          <div>
+            <span class="text-xs text-blue-300 block">2027년 정부안 총액</span>
+            <span id="domainStat2027" class="text-xl font-bold text-white">-</span>
+          </div>
+          <div>
+            <span class="text-xs text-blue-300 block">전년대비 증감 규모 (증가율)</span>
+            <span id="domainStatDiff" class="text-xl font-bold text-emerald-400">-</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 해당 분야 세부 사업 수평 막대 차트 -->
+      <div class="dashboard-card p-5">
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <h3 class="text-base font-bold text-slate-900">세부 사업별 예산 규모 순위 (상위 10개)</h3>
+            <p class="text-xs text-slate-400">2026년 vs 2027년 정부안 수평 비교</p>
+          </div>
+          <span class="text-xs text-slate-500">단위: 억원</span>
+        </div>
+        <div class="chart-wrapper-tall">
+          <canvas id="chartDomainDetailBar"></canvas>
+        </div>
+      </div>
+
+      <!-- 해당 분야 세부 사업 카드 그리드 -->
+      <div>
+        <h3 class="text-base font-bold text-slate-900 mb-3 flex items-center gap-2">
+          <i class="fa-solid fa-list-check text-blue-600"></i> 세부 사업별 카드 및 원문 근거 요약
+        </h3>
+        <div id="domainProjectsCards" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <!-- JS 동적 렌더링 -->
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ----------------------------------------
+         탭 3: 신규사업 집중 분석 (New Projects)
+         ---------------------------------------- -->
+    <div id="tab-new-projects" class="tab-content hidden space-y-6">
+      
+      <!-- 신규사업 총괄 헤더 -->
+      <div class="dashboard-card p-6 bg-gradient-to-r from-purple-900 via-indigo-900 to-slate-900 text-white">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div>
+            <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-500/20 text-purple-200 border border-purple-400/30 text-xs font-semibold mb-2">
+              <i class="fa-solid fa-sparkles"></i> 2027년 신규 착수 및 제도 신설 사업
+            </div>
+            <h2 class="text-2xl font-black">신규 전략 투자 사업 집중 대시보드</h2>
+            <p class="text-xs text-purple-200/80 mt-1">
+              전년도 예산이 없거나(0원) 신규/신설로 명시된 사업들을 추출하여 정책적 중요도를 분석합니다.
+            </p>
+          </div>
+          
+          <div class="grid grid-cols-3 gap-4 bg-white/10 p-4 rounded-xl border border-white/10 backdrop-blur-sm">
+            <div class="text-center">
+              <span class="text-xs text-purple-200 block">신규 사업 수</span>
+              <span id="newProjCountStat" class="text-2xl font-black text-white">-</span>
+            </div>
+            <div class="text-center px-4 border-x border-white/10">
+              <span class="text-xs text-purple-200 block">신규 예산 총액</span>
+              <span id="newProjBudgetStat" class="text-2xl font-black text-purple-300">-</span>
+            </div>
+            <div class="text-center">
+              <span class="text-xs text-purple-200 block">전체 예산 대비</span>
+              <span id="newProjShareStat" class="text-2xl font-black text-emerald-400">-</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 신규사업 분야별 분포 차트 -->
+      <div class="dashboard-card p-5">
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <h3 class="text-base font-bold text-slate-900">분야별 신규사업 예산 배분 현황</h3>
+            <p class="text-xs text-slate-400">어느 전략 분야에 신규 프로젝트가 집중되었는지 확인합니다.</p>
+          </div>
+          <span class="badge-new">신규사업 총괄</span>
+        </div>
+        <div class="chart-wrapper">
+          <canvas id="chartNewProjectsDist"></canvas>
+        </div>
+      </div>
+
+      <!-- 신규사업 카드 그리드 -->
+      <div>
+        <h3 class="text-base font-bold text-slate-900 mb-3 flex items-center gap-2">
+          <i class="fa-solid fa-star text-amber-500"></i> 2027년 신규 사업 세부 내역 및 핵심 원문
+        </h3>
+        <div id="newProjectsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-5">
+          <!-- JS 동적 렌더링 -->
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ----------------------------------------
+         탭 4: 데이터 탐색 및 검색 (Table)
+         ---------------------------------------- -->
+    <div id="tab-table" class="tab-content hidden space-y-4">
+      
+      <!-- 검색 및 필터 컨트롤 바 -->
+      <div class="dashboard-card p-4 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
+        
+        <!-- 검색창 -->
+        <div class="relative flex-1">
+          <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+          <input type="text" id="tableSearchInput" placeholder="사업명, 분야명, 보도자료 키워드로 실시간 검색..." 
+            class="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
+        </div>
+
+        <!-- 필터 및 토글 -->
+        <div class="flex flex-wrap items-center gap-3">
+          <select id="tableDomainFilter" class="border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <option value="">전체 분야</option>
+          </select>
+
+          <label class="flex items-center gap-2 text-sm font-semibold text-purple-700 bg-purple-50 px-3 py-2 rounded-lg border border-purple-200 cursor-pointer hover:bg-purple-100 transition">
+            <input type="checkbox" id="tableNewOnlyFilter" class="w-4 h-4 text-purple-600 rounded">
+            <span>신규사업만 보기</span>
+          </label>
+
+          <button id="btnDownloadCsv" class="bg-slate-800 hover:bg-slate-900 text-white text-xs font-semibold px-4 py-2 rounded-lg shadow-sm transition flex items-center gap-1.5">
+            <i class="fa-solid fa-download"></i> CSV 내보내기
+          </button>
+        </div>
+
+      </div>
+
+      <!-- 데이터 테이블 -->
+      <div class="dashboard-card overflow-hidden">
+        <div class="p-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between text-xs text-slate-500">
+          <span id="tableRowCount">총 0건</span>
+          <span class="text-blue-600 font-medium">행을 클릭하면 '핵심 내용 및 보도자료 원문 근거' 전문을 확인할 수 있습니다.</span>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-sm custom-table">
+            <thead>
+              <tr>
+                <th class="cursor-pointer text-center" data-sort="no" title="연번 정렬">연번 <i class="fa-solid fa-sort text-[10px] text-slate-400"></i></th>
+                <th class="cursor-pointer" data-sort="domain" title="분야 정렬">분야 (중점영역) <i class="fa-solid fa-sort text-[10px] text-slate-400"></i></th>
+                <th class="cursor-pointer" data-sort="project" title="사업명 정렬">세부 사업 / 주요 지표 <i class="fa-solid fa-sort text-[10px] text-slate-400"></i></th>
+                <th class="text-center">단위</th>
+                <th class="cursor-pointer text-right" data-sort="y2026" title="2026 예산 정렬">2026년 (A) <i class="fa-solid fa-sort text-[10px] text-slate-400"></i></th>
+                <th class="cursor-pointer text-right" data-sort="y2027" title="2027 정부안 정렬">2027년 정부안 (B) <i class="fa-solid fa-sort text-[10px] text-slate-400"></i></th>
+                <th class="cursor-pointer text-right" data-sort="diff" title="증감액 정렬">증감 (B-A) <i class="fa-solid fa-sort text-[10px] text-slate-400"></i></th>
+                <th class="cursor-pointer text-right" data-sort="rate" title="증감율 정렬">증감율 (%) <i class="fa-solid fa-sort text-[10px] text-slate-400"></i></th>
+                <th>핵심 내용 및 보도자료 박스 원문 근거</th>
+              </tr>
+            </thead>
+            <tbody id="mainDataTableBody">
+              <!-- JS 동적 렌더링 -->
+            </tbody>
+          </table>
+        </div>
+
+        <!-- 페이징 컨트롤 -->
+        <div class="p-4 border-t border-slate-100 flex items-center justify-between">
+          <button id="prevPageBtn" class="text-xs font-semibold px-3 py-1.5 rounded border border-slate-200 hover:bg-slate-50 transition flex items-center gap-1">
+            <i class="fa-solid fa-chevron-left text-[10px]"></i> 이전
+          </button>
+          <span id="pageInfo" class="text-xs font-medium text-slate-600">1 / 1 페이지</span>
+          <button id="nextPageBtn" class="text-xs font-semibold px-3 py-1.5 rounded border border-slate-200 hover:bg-slate-50 transition flex items-center gap-1">
+            다음 <i class="fa-solid fa-chevron-right text-[10px]"></i>
+          </button>
+        </div>
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- ==========================================
+       6. 상세 모달 (원문 근거 팝업)
+       ========================================== -->
+  <div id="detailModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 modal-backdrop hidden" onclick="if(event.target === this) closeDetailModal()">
+    <div class="bg-white rounded-2xl max-w-2xl w-full shadow-2xl modal-content border border-slate-200 overflow-hidden">
+      
+      <!-- 모달 헤더 -->
+      <div class="p-6 bg-slate-900 text-white flex items-start justify-between">
+        <div>
+          <div class="flex items-center gap-2 mb-2">
+            <span id="modalDomainName" class="badge-domain text-xs bg-slate-800 text-blue-200 border-slate-700">-</span>
+            <span id="modalNewBadge" class="badge-new hidden">신규 사업</span>
+          </div>
+          <h3 id="modalProjectName" class="text-xl font-extrabold text-white leading-snug">-</h3>
+        </div>
+        <button onclick="closeDetailModal()" class="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-slate-400 hover:text-white transition">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <!-- 모달 본문 수치 요약 -->
+      <div class="p-6 space-y-5">
+        <div class="grid grid-cols-3 gap-3 bg-slate-50 p-4 rounded-xl border border-slate-100">
+          <div>
+            <span class="text-xs text-slate-400 block mb-0.5">2026년 본예산</span>
+            <span id="modal2026" class="text-base font-bold text-slate-700">-</span>
+          </div>
+          <div>
+            <span class="text-xs text-slate-400 block mb-0.5">2027년 정부안</span>
+            <span id="modal2027" class="text-base font-black text-blue-900">-</span>
+          </div>
+          <div>
+            <span class="text-xs text-slate-400 block mb-0.5">전년 대비 증감</span>
+            <span id="modalDiff" class="text-base font-bold text-emerald-600">-</span>
+          </div>
+        </div>
+
+        <div>
+          <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+            <i class="fa-solid fa-quote-left text-blue-500"></i> 핵심 내용 및 보도자료 박스 원문 근거
+          </h4>
+          <div class="bg-blue-50/50 p-4 rounded-xl border border-blue-100 text-slate-800 text-sm leading-relaxed whitespace-pre-wrap font-sans" id="modalEvidenceText">
+            -
+          </div>
+        </div>
+
+        <div class="flex items-center justify-between text-xs text-slate-400 pt-3 border-t border-slate-100">
+          <span>단위: <span id="modalUnit" class="font-semibold text-slate-600">억원</span></span>
+          <span>출처: 2026.9.3 국방부 보도자료 및 주요사업 설명자료</span>
+        </div>
+      </div>
+
+      <!-- 모달 푸터 -->
+      <div class="p-4 bg-slate-50 border-t border-slate-100 flex justify-end">
+        <button onclick="closeDetailModal()" class="px-5 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition">
+          확인
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ==========================================
+       7. 푸터
+       ========================================== -->
+  <footer class="bg-white border-t border-slate-200 py-6 mt-12 text-center text-xs text-slate-500 no-print">
+    <div class="max-w-7xl mx-auto px-4">
+      <p class="font-medium text-slate-700">2027년 국방예산 정부안 중점투자사업 인터랙티브 대시보드</p>
+      <p class="mt-1 text-slate-400">지원 형식: 엑셀(.xlsx, .xls), CSV(.csv) | 이미지 서식 및 보도자료 원문 자동 매핑 지원</p>
+    </div>
+  </footer>
+
+  <!-- 샘플 데이터 및 앱 스크립트 로드 -->
+  <script src="js/sample-data.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
